@@ -271,8 +271,25 @@ function renderColumnGuides(
 }
 
 /**
+ * Gets the href shared by all runs in a segment, or undefined if mixed/none.
+ */
+function segmentHref(seg: StyledSegment): string | undefined {
+  const href = seg.runs[0]?.style.href
+  if (!href) return undefined
+  for (const run of seg.runs) {
+    if (run.style.href !== href) return undefined
+  }
+  return href
+}
+
+/** Check if all runs in a segment are code */
+function segmentIsCode(seg: StyledSegment): boolean {
+  return seg.runs.length > 0 && seg.runs.every((r) => r.style.code)
+}
+
+/**
  * Renders styled word segments into a parent element.
- * Each word gets a wrapper span; each run within gets its own styled span.
+ * Consecutive words sharing the same href are wrapped in a single <a> tag.
  * @param gapPx - word gap in pixels, or -1 to use natural spaces
  */
 function renderStyledWords(
@@ -280,31 +297,80 @@ function renderStyledWords(
   segments: StyledSegment[],
   gapPx: number,
 ): void {
-  for (let w = 0; w < segments.length; w++) {
-    const seg = segments[w]
-    const wordSpan = document.createElement('span')
+  let w = 0
+  while (w < segments.length) {
+    const href = segmentHref(segments[w])
 
-    if (gapPx >= 0 && w < segments.length - 1) {
-      wordSpan.style.marginRight = `${gapPx}px`
-    } else if (gapPx < 0 && w < segments.length - 1) {
-      // Natural space for incomplete lines
-      const spaceSpan = document.createElement('span')
-      spaceSpan.textContent = ' '
-      // Append space after this word span below
-      renderRunSpans(wordSpan, seg.runs)
+    if (href) {
+      // Group consecutive words with the same href under one <a>
+      const a = document.createElement('a')
+      a.href = href
+      a.style.color = 'inherit'
+      a.style.textDecoration = 'underline'
+
+      while (w < segments.length && segmentHref(segments[w]) === href) {
+        const wordSpan = document.createElement('span')
+        if (gapPx >= 0 && w < segments.length - 1) {
+          wordSpan.style.marginRight = `${gapPx}px`
+        }
+        renderRunSpans(wordSpan, segments[w].runs, true)
+        a.appendChild(wordSpan)
+        w++
+      }
+      parent.appendChild(a)
+    } else if (segmentIsCode(segments[w])) {
+      // Group consecutive code words under one <code>
+      const code = document.createElement('code')
+      code.style.backgroundColor = 'rgba(128,128,128,0.12)'
+      code.style.borderRadius = '3px'
+      code.style.boxDecorationBreak = 'clone'
+
+      while (w < segments.length && segmentIsCode(segments[w])) {
+        const wordSpan = document.createElement('span')
+        if (gapPx >= 0 && w < segments.length - 1) {
+          wordSpan.style.marginRight = `${gapPx}px`
+        }
+        renderRunSpans(wordSpan, segments[w].runs, false, true)
+        code.appendChild(wordSpan)
+        w++
+      }
+      parent.appendChild(code)
+    } else {
+      const seg = segments[w]
+      const wordSpan = document.createElement('span')
+
+      if (gapPx >= 0 && w < segments.length - 1) {
+        wordSpan.style.marginRight = `${gapPx}px`
+      } else if (gapPx < 0 && w < segments.length - 1) {
+        renderRunSpans(wordSpan, seg.runs, false)
+        parent.appendChild(wordSpan)
+        const spaceSpan = document.createElement('span')
+        spaceSpan.textContent = ' '
+        parent.appendChild(spaceSpan)
+        w++
+        continue
+      }
+
+      renderRunSpans(wordSpan, seg.runs, false)
       parent.appendChild(wordSpan)
-      parent.appendChild(spaceSpan)
-      continue
+      w++
     }
-
-    renderRunSpans(wordSpan, seg.runs)
-    parent.appendChild(wordSpan)
   }
 }
 
-function renderRunSpans(parent: HTMLElement, runs: ResolvedRun[]): void {
+/**
+ * Renders individual run spans inside a word element.
+ * When insideLink is true, runs skip <a> wrapping (parent is already an <a>).
+ * When insideCode is true, runs skip <code> styling (parent is already a <code>).
+ */
+function renderRunSpans(
+  parent: HTMLElement,
+  runs: ResolvedRun[],
+  insideLink: boolean,
+  insideCode = false,
+): void {
   for (const run of runs) {
-    if (run.style.href) {
+    if (run.style.href && !insideLink) {
       const a = document.createElement('a')
       a.href = run.style.href
       a.textContent = run.text
@@ -316,7 +382,7 @@ function renderRunSpans(parent: HTMLElement, runs: ResolvedRun[]): void {
       const span = document.createElement('span')
       span.textContent = run.text
       span.style.font = run.font
-      if (run.style.code) {
+      if (run.style.code && !insideCode) {
         span.style.backgroundColor = 'rgba(128,128,128,0.12)'
         span.style.borderRadius = '3px'
         span.style.boxDecorationBreak = 'clone'

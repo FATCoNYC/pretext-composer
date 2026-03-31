@@ -120,7 +120,7 @@ export const DEFAULT_CONFIG: JustifyConfig = {
   lastLineAlignment: 'left',
   textMode: 'justify',
   avoidWidows: true,
-  ragStyle: 'even',
+  ragStyle: 'long-short',
   ragBalance: 50,
   ragShortLine: 75,
   opticalAlignment: false,
