@@ -1,6 +1,6 @@
 # @fatconyc/pretext-composer
 
-A paragraph composer that is better than inDesign's with proper justification, optical margins/hanging punctuation, and editorial rags. Built on [@chenglou/pretext](https://github.com/chenglou/pretext).
+A paragraph composer that is better than inDesign's with proper justification, optical margins/hanging punctuation, editorial rags, multi-column layout, and inline markdown styling. Built on [@chenglou/pretext](https://github.com/chenglou/pretext).
 
 ## Install
 
@@ -27,6 +27,75 @@ renderToDOM({
 })
 ```
 
+### With Markdown
+
+```ts
+const result = compose({
+  text: 'Typography is the **art and technique** of arranging type.',
+  font: '16px Georgia',
+  containerWidth: 480,
+  markdown: true,
+})
+```
+
+Bold, italic, inline code, and links are parsed and rendered with per-run font resolution. Custom fonts can be provided:
+
+```ts
+const result = compose({
+  text: 'Hello **world** and `code`',
+  font: '16px Georgia',
+  containerWidth: 480,
+  markdown: true,
+  fonts: {
+    bold: 'bold 16px Georgia',
+    italic: 'italic 16px Georgia',
+    code: '14px "Fira Code", monospace',
+  },
+})
+```
+
+Or derive fonts from your page's CSS automatically:
+
+```ts
+import { resolveFontsFromCSS } from '@fatconyc/pretext-composer'
+
+const fonts = resolveFontsFromCSS(document.body, '16px Georgia')
+```
+
+### Multi-Column Layout
+
+```ts
+import { composeColumns, renderColumnsToDOM } from '@fatconyc/pretext-composer'
+
+// Pure computation — pass column widths directly, no DOM needed
+const result = composeColumns({
+  text: 'Long text...',
+  font: '16px Georgia',
+  columns: [300, 300],       // array of column widths in px
+  markdown: true,
+  config: {
+    columnGap: 24,
+    columnBalance: 'balanced', // or 'fill-first'
+    columnOrphans: 2,
+    columnWidows: 2,
+  },
+})
+
+// Or read column geometry from a CSS grid element
+const result = composeColumns({
+  text: 'Long text...',
+  font: '16px Georgia',
+  columns: document.querySelector('.grid-container'),
+})
+
+// Render into a grid container
+renderColumnsToDOM({
+  container: document.querySelector('.grid-container'),
+  result,
+  font: '16px Georgia',
+})
+```
+
 ## API
 
 ### `compose(options): JustifyResult`
@@ -39,6 +108,8 @@ interface ComposeOptions {
   font: string           // CSS font shorthand (e.g., "16px Georgia")
   containerWidth: number // Container width in pixels
   config?: Partial<JustifyConfig>
+  markdown?: boolean     // Parse text as markdown with inline styling
+  fonts?: FontMap        // Custom fonts for bold/italic/code
 }
 ```
 
@@ -53,18 +124,44 @@ interface JustifyResult {
 }
 
 interface JustifiedLine {
-  segments: string[]     // Words on this line
-  isLastLine: boolean    // Last line of a paragraph
-  wordGapPx: number      // Exact pixel gap between words
-  letterSpacingPx: number // Letter spacing adjustment in px
-  glyphScale: number     // Horizontal glyph scale (1 = normal)
-  y: number              // Y position
-  hangLeft: number       // Left hanging punctuation offset in px
-  hangRight: number      // Right hanging punctuation offset in px
+  segments: string[]          // Words on this line
+  styledSegments?: StyledSegment[] // Styled runs per word (when markdown is used)
+  isLastLine: boolean         // Last line of a paragraph
+  wordGapPx: number           // Exact pixel gap between words
+  letterSpacingPx: number     // Letter spacing adjustment in px
+  glyphScale: number          // Horizontal glyph scale (1 = normal)
+  y: number                   // Y position
+  hangLeft: number            // Left hanging punctuation offset in px
+  hangRight: number           // Right hanging punctuation offset in px
 }
 ```
 
-### `renderToDOM(options)`
+### `composeColumns(options): ColumnResult`
+
+Composes text across multiple columns with optimal column breaking.
+
+```ts
+interface ColumnComposeOptions {
+  text: string
+  font: string
+  columns: number[] | HTMLElement // Column widths array or CSS grid element
+  config?: Partial<ColumnConfig>
+  markdown?: boolean
+  fonts?: FontMap
+  columnHeight?: number   // Max column height for fill-first mode
+}
+
+interface ColumnConfig extends JustifyConfig {
+  columnBreakPenalty: number    // Cost of mid-paragraph breaks (default: 100)
+  columnBalance: 'balanced' | 'fill-first'
+  columnOrphans: number         // Min lines at column top (default: 2)
+  columnWidows: number          // Min lines at column bottom (default: 2)
+  columnGap: number | 'auto'   // Gap in px, or 'auto' to read from CSS grid
+  maxColumns: number            // Cap column count (default: Infinity)
+}
+```
+
+### `renderToDOM(options)` / `renderColumnsToDOM(options)`
 
 Renders justified text into a DOM container.
 
@@ -77,8 +174,8 @@ interface RenderOptions {
   lastLineAlignment?: 'left' | 'right' | 'center' | 'full'
   singleWordJustification?: 'left' | 'full' | 'right' | 'center'
   textMode?: 'justify' | 'rag'
-  showGuides?: boolean   // Debug overlays for margins and baseline grid
-  onTextChange?: (newText: string) => void // Enables inline editing
+  showGuides?: boolean
+  onTextChange?: (newText: string) => void
 }
 ```
 
@@ -146,59 +243,58 @@ const result = compose({
 ### Pipeline
 
 ```
-Text → Typographer's Quotes → Hyphenation → Line Breaking → Justification → Render
+Text/Markdown → Typographer's Quotes → Hyphenation → Line Breaking → Justification → Render
+                                             │               │
+                                     (styled runs     (styled runs
+                                      preserved)       preserved)
 ```
 
-1. **Typographer's quotes**: Straight quotes, dashes, and ellipses are replaced with curly quotes, em/en dashes, and ellipsis characters (if enabled)
-2. **Hyphenation**: Soft hyphens are inserted at valid break points using language-aware rules
-3. **Line breaking**: Knuth-Plass evaluates all possible break points across the paragraph to minimize overall "badness," or greedy breaks line-by-line
-4. **Justification**: Distributes slack across word spacing, letter spacing, and glyph scaling
-5. **Rendering**: DOM spans with `marginRight` for word gaps, CSS `letter-spacing`, and `transform: scaleX()` for glyph scaling
+1. **Markdown parsing** (optional): Converts markdown to styled runs using micromark + mdast-util-from-markdown
+2. **Typographer's quotes**: Straight quotes, dashes, and ellipses are replaced with curly quotes, em/en dashes, and ellipsis characters
+3. **Hyphenation**: Soft hyphens are inserted at valid break points using language-aware rules. Punctuation is stripped before dictionary lookup and reattached to syllables.
+4. **Line breaking**: Knuth-Plass evaluates all possible break points across the paragraph to minimize overall "badness," or greedy breaks line-by-line. A two-tier adjustment ratio penalizes glyph compression more steeply than word spacing changes, preferring hyphenation over squishing.
+5. **Justification**: Distributes slack across word spacing, letter spacing, and glyph scaling
+6. **Column breaking** (optional): Balanced or fill-first distribution across columns with orphan/widow constraints
+7. **Rendering**: DOM spans with `marginRight` for word gaps, CSS `letter-spacing`, and `transform: scaleX()` for glyph scaling. Styled text renders nested spans with per-run fonts.
 
 ### Justification Priority
 
 When a line needs to be stretched or compressed, adjustments are applied in this order:
 
-1. **Word spacing** — adjusted first (most natural, least visible)
-2. **Letter spacing** — adjusted if word spacing hits its bounds
-3. **Glyph scaling** — adjusted as a last resort within bounds
-4. **Overflow** — any remaining slack goes back into word spacing
-
-### Constraint Priority (what overrides what)
-
-When constraints conflict, this is the override order:
-
-1. **Minimum word spacing always wins** — words will never be closer than `wordSpacing.min` % of a normal space. If a line can't fit at minimum word spacing, glyph scaling is compressed further (even below `glyphScaling.min`) to make it fit.
-2. **No overflow** — lines never extend past the container width. The glyph scale absorbs whatever is needed.
-3. **Glyph scaling min is a preference, not a hard limit** — under normal conditions it's respected, but minimum word spacing takes priority.
-4. **Letter spacing bounds are respected** within the justification cascade, but the final scaleX recalculation may produce slightly different effective values.
+1. **Word spacing** -- adjusted first (most natural, least visible)
+2. **Letter spacing** -- adjusted if word spacing hits its bounds
+3. **Glyph scaling** -- adjusted as a last resort within bounds
+4. **Overflow** -- any remaining slack goes back into word spacing
 
 ### Optical Margin Alignment
 
 When `opticalAlignment` is enabled, punctuation at line edges hangs outside the text block so letter edges create a cleaner visual alignment. This is what InDesign calls "Optical Margin Alignment."
 
-Characters that hang fully (100% of width): `"` `"` `'` `'` `"` `'` `-` `–` `—` `.` `,`
+Characters that hang fully (100% of width): `"` `"` `'` `'` `"` `'` `-` `--` `---` `.` `,`
 
-Characters that hang partially (50%): `:` `;` `!` `?` `…`
+Characters that hang partially (50%): `:` `;` `!` `?` `...`
 
 ### Line Breaking
 
 Two composers are available:
 
-- **`'paragraph'`** (default) — Knuth-Plass optimal line breaking. Considers all possible break points across the entire paragraph to minimize overall "badness." Produces the best results. Required for rag mode.
-- **`'greedy'`** — Single-line-at-a-time breaking via pretext. Faster, matches browser behavior. Does not support rag tuning.
+- **`'paragraph'`** (default) -- Knuth-Plass optimal line breaking. Considers all possible break points across the entire paragraph to minimize overall "badness." Produces the best results. Required for rag mode and markdown styling.
+- **`'greedy'`** -- Single-line-at-a-time breaking via pretext. Faster, matches browser behavior. Does not support rag tuning or styled text.
 
-### Rag Mode
+### Column Breaking
 
-When `textMode: 'rag'`, lines are broken optimally but not justified — word gaps use natural spacing. Rag mode requires the `'paragraph'` composer because it uses Knuth-Plass to optimize line break positions for even or dramatic rag shapes.
+Two modes are available:
+
+- **`'balanced'`** (default) -- Binary searches for the minimum column height where all text fits, breaking mid-paragraph as needed. Distance from ideal fill dominates the cost model, with paragraph boundaries as tiebreakers.
+- **`'fill-first'`** -- Fills each column to the specified `columnHeight` before overflowing to the next. Respects orphan/widow constraints.
 
 ## Known Limitations
 
 - **Canvas vs DOM measurement**: Text width is measured via canvas `measureText()`, but rendered in DOM spans. Sub-pixel differences between the two can cause lines to be slightly under- or over-filled (typically < 1px).
-- **Greedy composer + rag**: The greedy composer does not support rag tuning (`ragBalance`, `ragShortLine`, `ragStyle`). These settings only affect the paragraph composer.
+- **Greedy composer + markdown/rag**: The greedy composer does not support styled text or rag tuning.
 - **Hyphenation language**: Currently hardcoded to English (`en-us`). Other languages are not yet supported.
 - **Font loading**: `compose()` measures text immediately. If the font hasn't loaded yet, measurements will use a fallback font. Ensure fonts are loaded before calling `compose()`.
-- **No multi-column support**: The engine composes a single text block. Multi-column layout should be built on top by splitting `JustifyResult.lines` across columns.
+- **Images**: Inline images in markdown are not yet supported.
 
 ## Playground
 
@@ -209,12 +305,13 @@ pnpm run playground
 ```
 
 Then open `http://localhost:3000`. Features:
+- Markdown text editor with live preview
+- Multi-column layout with balanced/fill-first controls
 - Live sliders for all justification parameters
 - Alignment toolbar (Left / Center / Right / Full)
 - Composer toggle (Knuth-Plass / Greedy)
 - Rag mode with balance controls
 - Browser comparison mode
-- Inline text editing (click to edit, click away to re-compose)
 - Visual guides: margin lines and baseline grid
 - Optical Margin Alignment toggle
 - Typographer's quotes toggle
@@ -225,19 +322,31 @@ Then open `http://localhost:3000`. Features:
 `compose()` returns plain data, so you can build your own renderer for any framework or target (React, Vue, Canvas, SVG, etc.):
 
 ```ts
-const result = compose({ text, font, containerWidth })
+const result = compose({ text, font, containerWidth, markdown: true })
 
 for (const line of result.lines) {
-  // line.segments — array of words
+  // line.segments — array of words (plain text)
+  // line.styledSegments — array of styled word data (when markdown is used)
   // line.wordGapPx — exact gap between each word
   // line.letterSpacingPx — letter spacing to apply
   // line.glyphScale — horizontal scale factor
   // line.hangLeft / line.hangRight — optical margin offsets
   // line.y — vertical position
+
+  if (line.styledSegments) {
+    for (const seg of line.styledSegments) {
+      for (const run of seg.runs) {
+        // run.text — text content
+        // run.font — resolved CSS font string
+        // run.style — { bold?, italic?, code?, href? }
+      }
+    }
+  }
 }
 ```
 
 ## Built On
 
-- [@chenglou/pretext](https://github.com/chenglou/pretext) — Fast, reflow-free text measurement and line breaking
-- [hyphen](https://github.com/ytiurin/hyphen) — Language-aware automatic hyphenation
+- [@chenglou/pretext](https://github.com/chenglou/pretext) -- Fast, reflow-free text measurement and line breaking
+- [hyphen](https://github.com/ytiurin/hyphen) -- Language-aware automatic hyphenation
+- [micromark](https://github.com/micromark/micromark) + [mdast-util-from-markdown](https://github.com/syntax-tree/mdast-util-from-markdown) -- Markdown parsing
