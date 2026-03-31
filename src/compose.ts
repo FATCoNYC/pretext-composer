@@ -410,12 +410,16 @@ function composeMarkdown(
   spaceCharWidth: number,
   fontMap?: import('./font-resolve.js').FontMap,
 ): JustifyResult {
-  // Apply typographer's quotes to the raw text before parsing
-  const mdText = config.typographersQuotes
-    ? applyTypographersQuotes(text)
-    : text
-
-  const styledParagraphs = parseMarkdownToRuns(mdText, fontSize)
+  // Parse markdown first, then apply typographer's quotes to each run's
+  // text content — not the raw markdown, which has syntax characters like **
+  const styledParagraphs = parseMarkdownToRuns(text, fontSize)
+  if (config.typographersQuotes) {
+    for (const para of styledParagraphs) {
+      for (const run of para) {
+        run.text = applyTypographersQuotes(run.text)
+      }
+    }
+  }
   const justifiedLines: JustifiedLine[] = []
   let currentY = 0
 
