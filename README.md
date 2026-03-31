@@ -251,7 +251,7 @@ Text/Markdown → Typographer's Quotes → Hyphenation → Line Breaking → Jus
 
 1. **Markdown parsing** (optional): Converts markdown to styled runs using micromark + mdast-util-from-markdown
 2. **Typographer's quotes**: Straight quotes, dashes, and ellipses are replaced with curly quotes, em/en dashes, and ellipsis characters
-3. **Hyphenation**: Soft hyphens are inserted at valid break points using language-aware rules. Punctuation is stripped before dictionary lookup and reattached to syllables.
+3. **Hyphenation**: Soft hyphens are inserted at valid break points using language-aware rules. Punctuation is stripped before dictionary lookup and reattached to syllables. Hard hyphens in compound words (e.g., "line-spacing") are treated as free (zero-cost) break points, always preferred over soft hyphens.
 4. **Line breaking**: Knuth-Plass evaluates all possible break points across the paragraph to minimize overall "badness," or greedy breaks line-by-line. A two-tier adjustment ratio penalizes glyph compression more steeply than word spacing changes, preferring hyphenation over squishing.
 5. **Justification**: Distributes slack across word spacing, letter spacing, and glyph scaling
 6. **Column breaking** (optional): Balanced or fill-first distribution across columns with orphan/widow constraints

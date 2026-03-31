@@ -637,6 +637,9 @@ Good typography is a matter of *visual rhythm* --- the interplay of **dark and l
 				renderToDOM,
 				composeColumns,
 				renderColumnsToDOM,
+				parseMarkdownToRuns,
+				parseFontSize,
+				getFontMetrics,
 			} from './bundle.js';
 
 			const $ = (id) => document.getElementById(id);
@@ -928,7 +931,24 @@ Good typography is a matter of *visual rhythm* --- the interplay of **dark and l
 							div.style.hyphens = 'auto';
 							div.lang = 'en';
 						}
-						div.textContent = text;
+						if ($('markdownEnabled').checked) {
+							const fontSize = parseInt($('fontSize').value);
+							const paras = parseMarkdownToRuns(text, fontSize);
+							div.innerHTML = paras.map(runs =>
+								'<p style="margin:0 0 ' + div.style.lineHeight + 'em 0">' +
+								runs.map(r => {
+									let html = r.text.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+									if (r.style.code) html = '<code style="font-size:0.85em;font-family:Menlo,Consolas,monospace;background:rgba(128,128,128,0.12);border-radius:3px">' + html + '</code>';
+									if (r.style.bold) html = '<strong>' + html + '</strong>';
+									if (r.style.italic) html = '<em>' + html + '</em>';
+									if (r.style.href) html = '<a href="' + r.style.href + '" style="color:inherit;text-decoration:underline">' + html + '</a>';
+									return html;
+								}).join('') +
+								'</p>'
+							).join('');
+						} else {
+							div.textContent = text;
+						}
 						out.appendChild(div);
 						if ($('showGuides').checked) {
 							const pad = getComputedStyle(out).paddingLeft;
@@ -941,16 +961,19 @@ Good typography is a matter of *visual rhythm* --- the interplay of **dark and l
 							rightGuide.style.cssText = `${guideBase}left:calc(${pad} + ${containerWidth}px);border-left:1.5px solid rgba(255,0,0,0.1);`;
 							out.appendChild(leftGuide);
 							out.appendChild(rightGuide);
-							// Baseline grid: uses grid value if set, otherwise line height
-							const fontSize = parseInt($('fontSize').value);
+							// Baseline grid: match composer's renderGuides exactly
+							const bFontSize = parseInt($('fontSize').value);
 							const leading =
 								parseInt($('autoLeading').value) / 100;
-							const lineHeightPx = Math.round(fontSize * leading);
+							const lineHeightPx = bFontSize * leading;
 							const grid = parseInt($('baselineGrid').value);
 							const gi = grid > 0 ? grid : lineHeightPx;
-							const contentHeight = div.offsetHeight;
+							const metrics = getFontMetrics(font);
+							const emHeight = metrics.ascent + metrics.descent;
+							const halfLeading = (lineHeightPx - emHeight) / 2;
+							const baselineOffset = halfLeading + metrics.ascent;
 							const gridOverlay = document.createElement('div');
-							gridOverlay.style.cssText = `position:absolute;top:calc(${padTop} - ${gi}px);left:0;right:0;height:${contentHeight + gi}px;pointer-events:none;z-index:0;background:repeating-linear-gradient(to bottom, transparent 0px, transparent ${gi - 1}px, rgba(135,206,235,0.5) ${gi - 1}px, rgba(135,206,235,0.5) ${gi}px);`;
+							gridOverlay.style.cssText = `position:absolute;top:calc(${padTop} - ${gi * 2}px + ${baselineOffset}px);left:0;right:0;bottom:0;pointer-events:none;z-index:0;background:repeating-linear-gradient(to bottom, transparent 0px, transparent ${gi - 1}px, rgba(135,206,235,0.5) ${gi - 1}px, rgba(135,206,235,0.5) ${gi}px);`;
 							out.appendChild(gridOverlay);
 						}
 					} else if ($('columnsEnabled').checked) {

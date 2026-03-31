@@ -49,6 +49,7 @@ export interface KPLine {
 
 const HYPHEN_PENALTY_COST = 50
 const CONSECUTIVE_HYPHEN_PENALTY = 3000
+const HARD_HYPHENS = new Set(['-', '\u2013', '\u2014'])
 
 function buildStyledItems(
   hWords: StyledHyphenatedWord[],
@@ -61,31 +62,28 @@ function buildStyledItems(
     const hw = hWords[w]
 
     if (hw.syllables.length <= 1) {
-      items.push({
-        type: 'box',
-        width: hw.width,
-        text: hw.text,
-        letterCount: hw.letterCount,
-        runs: hw.runs,
-      })
+      emitBoxWithHardHyphens(items, hw.text, hw.width, hw.letterCount, hw.runs)
     } else {
       for (let s = 0; s < hw.syllables.length; s++) {
-        items.push({
-          type: 'box',
-          width: hw.syllableWidths[s],
-          text: hw.syllables[s].map((r) => r.text).join(''),
-          letterCount: hw.syllables[s].reduce(
-            (sum, r) => sum + r.letterCount,
-            0,
-          ),
-          runs: hw.syllables[s],
-        })
+        const sylText = hw.syllables[s].map((r) => r.text).join('')
+        const sylLetters = hw.syllables[s].reduce(
+          (sum, r) => sum + r.letterCount,
+          0,
+        )
+        emitBoxWithHardHyphens(
+          items,
+          sylText,
+          hw.syllableWidths[s],
+          sylLetters,
+          hw.syllables[s],
+        )
         if (s < hw.syllables.length - 1) {
+          const endsHard = HARD_HYPHENS.has(sylText[sylText.length - 1])
           items.push({
             type: 'penalty',
-            width: hyphenWidth,
-            cost: HYPHEN_PENALTY_COST,
-            flagged: true,
+            width: endsHard ? 0 : hyphenWidth,
+            cost: endsHard ? 0 : HYPHEN_PENALTY_COST,
+            flagged: !endsHard,
           })
         }
       }
@@ -110,26 +108,24 @@ function buildItems(
     const hw = hWords[w]
 
     if (hw.syllables.length <= 1) {
-      items.push({
-        type: 'box',
-        width: hw.width,
-        text: hw.text,
-        letterCount: hw.letterCount,
-      })
+      emitBoxWithHardHyphens(items, hw.text, hw.width, hw.letterCount)
     } else {
       for (let s = 0; s < hw.syllables.length; s++) {
-        items.push({
-          type: 'box',
-          width: hw.syllableWidths[s],
-          text: hw.syllables[s],
-          letterCount: [...hw.syllables[s]].length,
-        })
+        const sylText = hw.syllables[s]
+        const sylWidth = hw.syllableWidths[s]
+        const sylLetters = [...sylText].length
+
+        emitBoxWithHardHyphens(items, sylText, sylWidth, sylLetters)
+
         if (s < hw.syllables.length - 1) {
+          // If this syllable ends with a hard hyphen, use a free unflagged
+          // penalty (no extra hyphen needed). Otherwise, normal soft hyphen.
+          const endsHard = HARD_HYPHENS.has(sylText[sylText.length - 1])
           items.push({
             type: 'penalty',
-            width: hyphenWidth,
-            cost: HYPHEN_PENALTY_COST,
-            flagged: true,
+            width: endsHard ? 0 : hyphenWidth,
+            cost: endsHard ? 0 : HYPHEN_PENALTY_COST,
+            flagged: !endsHard,
           })
         }
       }
@@ -141,6 +137,120 @@ function buildItems(
   }
 
   return items
+}
+
+/**
+ * Emits box items for text, splitting at hard hyphens (-, --, ---) with
+ * zero-cost penalties. The hyphen stays attached to the left fragment,
+ * so no extra width is needed at the break.
+ */
+function emitBoxWithHardHyphens(
+  items: Item[],
+  text: string,
+  width: number,
+  letterCount: number,
+  runs?: ResolvedRun[],
+): void {
+  // Check if text contains a hard hyphen (not at the very end — that's trailing punct)
+  const chars = [...text]
+  let hasHardHyphen = false
+  for (let i = 0; i < chars.length - 1; i++) {
+    if (HARD_HYPHENS.has(chars[i])) {
+      hasHardHyphen = true
+      break
+    }
+  }
+
+  if (!hasHardHyphen) {
+    items.push({ type: 'box', width, text, letterCount, runs })
+    return
+  }
+
+  // Split at hard hyphens, keeping hyphen on the left part
+  const fragments: string[] = []
+  let current = ''
+  for (let i = 0; i < chars.length; i++) {
+    current += chars[i]
+    if (HARD_HYPHENS.has(chars[i]) && i < chars.length - 1) {
+      fragments.push(current)
+      current = ''
+    }
+  }
+  if (current) fragments.push(current)
+
+  if (fragments.length <= 1) {
+    items.push({ type: 'box', width, text, letterCount, runs })
+    return
+  }
+
+  // Split runs across fragments by character offset
+  let runOffset = 0
+  for (let f = 0; f < fragments.length; f++) {
+    const frag = fragments[f]
+    const fragLetters = [...frag].length
+    let fragRuns: ResolvedRun[] | undefined
+
+    if (runs) {
+      fragRuns = sliceRuns(runs, runOffset, runOffset + fragLetters)
+      runOffset += fragLetters
+    }
+
+    items.push({
+      type: 'box',
+      width: width * (fragLetters / letterCount),
+      text: frag,
+      letterCount: fragLetters,
+      runs: fragRuns,
+    })
+    if (f < fragments.length - 1) {
+      // Zero-cost, zero-width penalty — the hyphen is already in the text.
+      // flagged: false so extractLine won't append an extra hyphen.
+      items.push({
+        type: 'penalty',
+        width: 0,
+        cost: 0,
+        flagged: false,
+      })
+    }
+  }
+}
+
+/** Slice a range of characters from a runs array, splitting runs at boundaries */
+function sliceRuns(
+  runs: ResolvedRun[],
+  startChar: number,
+  endChar: number,
+): ResolvedRun[] {
+  const result: ResolvedRun[] = []
+  let pos = 0
+
+  for (const run of runs) {
+    const runChars = [...run.text]
+    const runStart = pos
+    const runEnd = pos + runChars.length
+
+    if (runEnd <= startChar || runStart >= endChar) {
+      pos = runEnd
+      continue
+    }
+
+    const sliceStart = Math.max(0, startChar - runStart)
+    const sliceEnd = Math.min(runChars.length, endChar - runStart)
+    const slicedText = runChars.slice(sliceStart, sliceEnd).join('')
+
+    if (slicedText) {
+      result.push({
+        ...run,
+        text: slicedText,
+        letterCount: [...slicedText].length,
+        width: 0, // will be re-measured by extractStyledLine
+      })
+    }
+
+    pos = runEnd
+  }
+
+  return result
 }
 
 /**
@@ -469,8 +579,11 @@ export function knuthPlassBreak(
   const breaks: { idx: number; isHyphen: boolean }[] = []
   let cur: KPNode | null = endNode
   while (cur) {
+    const breakItem = cur.itemIndex < n ? items[cur.itemIndex] : null
+    // Only flag as hyphen if it's a soft hyphen (flagged=true).
+    // Hard hyphens (flagged=false) already have the hyphen in the text.
     const isHyphen =
-      cur.itemIndex < n && items[cur.itemIndex]?.type === 'penalty'
+      breakItem?.type === 'penalty' && (breakItem as Penalty).flagged
     breaks.unshift({ idx: cur.itemIndex, isHyphen })
     cur = cur.previous
   }
@@ -820,8 +933,11 @@ export function knuthPlassBreakStyled(
   const breaks: { idx: number; isHyphen: boolean }[] = []
   let cur: KPNode | null = endNode
   while (cur) {
+    const breakItem = cur.itemIndex < n ? items[cur.itemIndex] : null
+    // Only flag as hyphen if it's a soft hyphen (flagged=true).
+    // Hard hyphens (flagged=false) already have the hyphen in the text.
     const isHyphen =
-      cur.itemIndex < n && items[cur.itemIndex]?.type === 'penalty'
+      breakItem?.type === 'penalty' && (breakItem as Penalty).flagged
     breaks.unshift({ idx: cur.itemIndex, isHyphen })
     cur = cur.previous
   }

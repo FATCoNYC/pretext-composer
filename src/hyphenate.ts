@@ -15,29 +15,84 @@ const SOFT_HYPHEN = '\u00AD'
  * Returns an array of syllable fragments. E.g., "beautiful" → ["beau", "ti", "ful"]
  */
 // Punctuation that can appear at the edges of a word token
-const LEADING_PUNCT = /^[\u201C\u201D\u2018\u2019"'(\[{]+/
-const TRAILING_PUNCT = /[.,;:!?\u2014\u2013\u2026\u201C\u201D\u2018\u2019"')\]}]+$/
+const LEADING_PUNCT = /^[\u201C\u201D\u2018\u2019"'([{]+/
+const TRAILING_PUNCT =
+  /[.,;:!?\u2014\u2013\u2026\u201C\u201D\u2018\u2019"')\]}]+$/
+
+const HARD_HYPHENS = /[-\u2013\u2014]/
 
 export function hyphenateWord(
   word: string,
   config: HyphenationConfig,
 ): string[] {
-  // Strip any existing soft hyphens
   const clean = word.replace(/\u00AD/g, '')
 
-  // Separate leading/trailing punctuation so the hyphenation library
-  // sees a clean dictionary word (e.g. "arrangement," → "arrangement")
-  const leadMatch = clean.match(LEADING_PUNCT)
-  const trailMatch = clean.match(TRAILING_PUNCT)
+  // Split at hard hyphens first, then hyphenate each sub-part independently.
+  // "line-spacing" → ["line-", "spacing"] → hyphenate each → flatten.
+  // This prevents the library from adding soft hyphens across the hard hyphen.
+  if (hasInternalHardHyphen(clean)) {
+    return hyphenateCompound(clean, config)
+  }
+
+  return hyphenateSingleWord(clean, config)
+}
+
+/** Check if a string has a hard hyphen that's not at the very end */
+function hasInternalHardHyphen(text: string): boolean {
+  const chars = [...text]
+  for (let i = 0; i < chars.length - 1; i++) {
+    if (HARD_HYPHENS.test(chars[i])) return true
+  }
+  return false
+}
+
+/**
+ * Splits a compound word at hard hyphens, keeping the hyphen on the left.
+ * Each right-side part is hyphenated independently.
+ */
+function hyphenateCompound(word: string, config: HyphenationConfig): string[] {
+  const chars = [...word]
+  const parts: string[] = []
+  let current = ''
+
+  for (let i = 0; i < chars.length; i++) {
+    current += chars[i]
+    if (HARD_HYPHENS.test(chars[i]) && i < chars.length - 1) {
+      parts.push(current)
+      current = ''
+    }
+  }
+  if (current) parts.push(current)
+
+  // Each part ending with a hard hyphen stays atomic (it's a natural break).
+  // The last part (no trailing hyphen) gets soft-hyphenated normally.
+  const result: string[] = []
+  for (const part of parts) {
+    if (/[-\u2013\u2014]$/.test(part)) {
+      result.push(part)
+    } else {
+      result.push(...hyphenateSingleWord(part, config))
+    }
+  }
+
+  return result.length > 0 ? result : [word]
+}
+
+/** Hyphenate a single word (no hard hyphens) with punctuation handling */
+function hyphenateSingleWord(
+  word: string,
+  config: HyphenationConfig,
+): string[] {
+  const leadMatch = word.match(LEADING_PUNCT)
+  const trailMatch = word.match(TRAILING_PUNCT)
   const leading = leadMatch ? leadMatch[0] : ''
   const trailing = trailMatch ? trailMatch[0] : ''
-  const core = clean.slice(leading.length, clean.length - (trailing.length || 0))
+  const core = word.slice(leading.length, word.length - (trailing.length || 0))
 
   if ([...core].length < config.minWordLength) {
     return [word]
   }
 
-  // Get all possible hyphenation points from the library
   const hyphenated = hyphenateSync(core, {
     hyphenChar: SOFT_HYPHEN,
     minWordLength: config.minWordLength,
@@ -46,24 +101,21 @@ export function hyphenateWord(
   const parts = hyphenated.split(SOFT_HYPHEN)
   if (parts.length <= 1) return [word]
 
-  // Filter based on afterFirst / beforeLast rules
   const filtered: string[] = []
   let charsSoFar = 0
 
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i]
-    // Characters after the break point = everything from this part onward
     const charsAfterBreak = [...core].length - charsSoFar
 
     const canBreakHere =
-      i > 0 && // can't break before the first part
-      charsSoFar >= config.afterFirst && // enough chars before
-      charsAfterBreak >= config.beforeLast // enough chars after
+      i > 0 &&
+      charsSoFar >= config.afterFirst &&
+      charsAfterBreak >= config.beforeLast
 
     if (canBreakHere || i === 0) {
       filtered.push(part)
     } else {
-      // Merge with previous part
       filtered[filtered.length - 1] += part
     }
 
@@ -72,7 +124,6 @@ export function hyphenateWord(
 
   if (filtered.length <= 1) return [word]
 
-  // Reattach punctuation to first/last syllables
   if (leading) filtered[0] = leading + filtered[0]
   if (trailing) filtered[filtered.length - 1] += trailing
 
