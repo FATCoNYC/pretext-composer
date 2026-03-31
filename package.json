@@ -1,0 +1,27 @@
+{
+  "name": "pretext-composer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup && cp playground/index.html docs/index.html",
+    "dev": "tsup --watch",
+    "playground": "tsup && cp playground/index.html docs/index.html && npx serve docs",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --fix src/"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.30.0",
+  "dependencies": {
+    "@chenglou/pretext": "^0.0.3",
+    "hyphen": "^1.14.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.2"
+  }
+}

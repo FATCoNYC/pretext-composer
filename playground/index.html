@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Pretext Composer — Playground</title>
+		<style>
+			* {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+			}
+
+			body {
+				font-family: system-ui, sans-serif;
+				background: #f5f5f5;
+				color: #222;
+				padding: 24px;
+				display: flex;
+				gap: 24px;
+				min-height: 100vh;
+			}
+
+			.controls {
+				width: 320px;
+				flex-shrink: 0;
+				display: flex;
+				flex-direction: column;
+				gap: 16px;
+			}
+
+			h1 {
+				font-size: 18px;
+				font-weight: 600;
+			}
+
+			.control-group {
+				background: #fff;
+				border: 1px solid #ddd;
+				border-radius: 8px;
+				padding: 12px;
+			}
+
+			.control-group h2 {
+				font-size: 13px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+				color: #666;
+				margin-bottom: 8px;
+			}
+
+			.slider-row {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				margin-bottom: 4px;
+			}
+
+			.slider-row label {
+				font-size: 12px;
+				width: 60px;
+				flex-shrink: 0;
+			}
+
+			.slider-row input[type='range'] {
+				flex: 1;
+			}
+
+			.slider-row .value {
+				font-size: 12px;
+				width: 40px;
+				text-align: right;
+				font-variant-numeric: tabular-nums;
+			}
+
+			textarea {
+				width: 100%;
+				min-height: 120px;
+				padding: 8px;
+				font-family: inherit;
+				font-size: 14px;
+				border: 1px solid #ccc;
+				border-radius: 4px;
+				resize: vertical;
+			}
+
+			select,
+			input[type='number'] {
+				padding: 4px 8px;
+				font-size: 13px;
+				border: 1px solid #ccc;
+				border-radius: 4px;
+			}
+
+			.preview-area {
+				flex: 1;
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+				position: sticky;
+				top: 24px;
+				align-self: flex-start;
+			}
+
+			#output {
+				background: #fff;
+				border: 1px solid #ddd;
+				border-radius: 8px;
+				padding: 64px 64px 32px;
+				min-height: 300px;
+				width: fit-content;
+			}
+
+			.row {
+				display: flex;
+				gap: 8px;
+				align-items: center;
+			}
+			.row label {
+				font-size: 12px;
+			}
+
+			.alignment-bar {
+				display: flex;
+				gap: 0;
+			}
+
+			.alignment-bar button {
+				flex: 1;
+				padding: 6px 8px;
+				font-size: 12px;
+				font-weight: 500;
+				border: 1px solid #ccc;
+				background: #fff;
+				cursor: pointer;
+				transition:
+					background 0.1s,
+					border-color 0.1s;
+			}
+
+			.alignment-bar button:first-child {
+				border-radius: 4px 0 0 4px;
+			}
+			.alignment-bar button:last-child {
+				border-radius: 0 4px 4px 0;
+			}
+			.alignment-bar button:not(:first-child) {
+				border-left: none;
+			}
+
+			.alignment-bar button.active {
+				background: #222;
+				color: #fff;
+				border-color: #222;
+			}
+
+			.alignment-bar button:hover:not(.active) {
+				background: #f0f0f0;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="controls">
+			<h1>Pretext Composer</h1>
+
+			<input
+				type="hidden"
+				id="textInput"
+				value="Typography is the art and technique of arranging type to make written language legible, readable and appealing when displayed. The arrangement of type involves selecting typefaces, point sizes, line lengths, line-spacing, and letter-spacing, and adjusting the space between pairs of letters. The term &#x201C;typography&#x201D; is also applied to the style, arrangement, and appearance of the letters, numbers, and symbols created by the process."
+			/>
+
+			<div class="control-group">
+				<h2>Alignment</h2>
+				<div class="alignment-bar" id="alignmentBar">
+					<button data-align="left" class="active">Left</button
+					><button data-align="center">Center</button
+					><button data-align="right">Right</button
+					><button data-align="full">Full</button>
+				</div>
+			</div>
+
+			<div class="control-group">
+				<h2>Mode</h2>
+				<div class="alignment-bar" id="modeBar">
+					<button data-mode="justify" class="active">Justify</button
+					><button data-mode="rag">Rag</button
+					><button data-mode="browser">Browser</button>
+				</div>
+				<div id="ragControls" style="display: none; margin-top: 8px">
+					<div class="slider-row">
+						<label>Rag</label>
+						<input
+							type="range"
+							id="ragShortLine"
+							min="50"
+							max="100"
+							value="75"
+							step="1"
+						/>
+						<span class="value" id="ragShortLineVal">75%</span>
+					</div>
+					<div
+						style="
+							display: flex;
+							justify-content: space-between;
+							font-size: 10px;
+							color: #999;
+							margin-top: 2px;
+						"
+					>
+						<span>Dramatic</span>
+						<span>Even</span>
+					</div>
+				</div>
+			</div>
+
+			<div class="control-group">
+				<h2>Composer</h2>
+				<div class="alignment-bar" id="composerBar">
+					<button data-composer="paragraph" class="active">
+						Paragraph</button
+					><button data-composer="greedy">Greedy</button>
+				</div>
+			</div>
+
+			<div class="control-group">
+				<h2>Container</h2>
+				<div class="slider-row">
+					<label>Width</label>
+					<input
+						type="range"
+						id="containerWidth"
+						min="200"
+						max="800"
+						value="480"
+					/>
+					<span class="value" id="containerWidthVal">480</span>
+				</div>
+				<div class="row" style="margin-top: 8px">
+					<label>Font</label>
+					<input
+						type="text"
+						id="fontInput"
+						value="16px Georgia"
+						style="
+							flex: 1;
+							padding: 4px 8px;
+							font-size: 13px;
+							border: 1px solid #ccc;
+							border-radius: 4px;
+						"
+					/>
+				</div>
+			</div>
+
+			<div class="control-group">
+				<h2>Word Spacing (%)</h2>
+				<div class="slider-row">
+					<label>Min</label>
+					<input
+						type="range"
+						id="wsMin"
+						min="0"
+						max="250"
+						value="75"
+					/>
+					<span class="value" id="wsMinVal">75</span>
+				</div>
+				<div class="slider-row">
+					<label>Desired</label>
+					<input
+						type="range"
+						id="wsDesired"
+						min="0"
+						max="250"
+						value="85"
+					/>
+					<span class="value" id="wsDesiredVal">85</span>
+				</div>
+				<div class="slider-row">
+					<label>Max</label>
+					<input
+						type="range"
+						id="wsMax"
+						min="0"
+						max="250"
+						value="110"
+					/>
+					<span class="value" id="wsMaxVal">110</span>
+				</div>
+			</div>
+
+			<div class="control-group">
+				<h2>Letter Spacing (%)</h2>
+				<div class="slider-row">
+					<label>Min</label>
+					<input
+						type="range"
+						id="lsMin"
+						min="-20"
+						max="20"
+						value="-2"
+					/>
+					<span class="value" id="lsMinVal">-2</span>
+				</div>
+				<div class="slider-row">
+					<label>Desired</label>
+					<input
+						type="range"
+						id="lsDesired"
+						min="-20"
+						max="20"
+						value="0"
+					/>
+					<span class="value" id="lsDesiredVal">0</span>
+				</div>
+				<div class="slider-row">
+					<label>Max</label>
+					<input
+						type="range"
+						id="lsMax"
+						min="-20"
+						max="20"
+						value="4"
+					/>
+					<span class="value" id="lsMaxVal">4</span>
+				</div>
+			</div>
+
+			<div class="control-group">
+				<h2>Glyph Scaling (%)</h2>
+				<div class="slider-row">
+					<label>Min</label>
+					<input
+						type="range"
+						id="gsMin"
+						min="80"
+						max="120"
+						value="98"
+					/>
+					<span class="value" id="gsMinVal">98</span>
+				</div>
+				<div class="slider-row">
+					<label>Desired</label>
+					<input
+						type="range"
+						id="gsDesired"
+						min="80"
+						max="120"
+						value="100"
+					/>
+					<span class="value" id="gsDesiredVal">100</span>
+				</div>
+				<div class="slider-row">
+					<label>Max</label>
+					<input
+						type="range"
+						id="gsMax"
+						min="80"
+						max="120"
+						value="102"
+					/>
+					<span class="value" id="gsMaxVal">102</span>
+				</div>
+			</div>
+
+			<div class="control-group">
+				<h2>Other</h2>
+				<div class="slider-row">
+					<label>Leading</label>
+					<input
+						type="range"
+						id="autoLeading"
+						min="80"
+						max="200"
+						value="125"
+					/>
+					<span class="value" id="autoLeadingVal">125%</span>
+				</div>
+				<div class="row">
+					<label>Single Word</label>
+					<select id="singleWord">
+						<option value="left" selected>Align Left</option>
+						<option value="center">Align Center</option>
+						<option value="right">Align Right</option>
+						<option value="full">Full Justify</option>
+					</select>
+				</div>
+				<div class="slider-row" style="margin-top: 8px">
+					<label>Grid</label>
+					<input
+						type="range"
+						id="baselineGrid"
+						min="0"
+						max="40"
+						value="0"
+					/>
+					<span class="value" id="baselineGridVal">off</span>
+				</div>
+				<div class="row" style="margin-top: 8px">
+					<label>
+						<input type="checkbox" id="avoidWidows" checked /> Avoid
+						Widows
+					</label>
+				</div>
+				<div class="row" style="margin-top: 4px">
+					<label>
+						<input type="checkbox" id="opticalAlignment" /> Optical
+						Margin Alignment
+					</label>
+				</div>
+				<div class="row" style="margin-top: 4px">
+					<label>
+						<input type="checkbox" id="smartQuotes" checked /> Smart
+						Quotes
+					</label>
+				</div>
+				<div class="row" style="margin-top: 4px">
+					<label>
+						<input type="checkbox" id="showGuides" checked /> Show
+						Guides
+					</label>
+				</div>
+			</div>
+
+			<div class="control-group">
+				<h2>Hyphenation</h2>
+				<div class="row">
+					<label>
+						<input type="checkbox" id="hyphenEnabled" checked />
+						Enabled
+					</label>
+				</div>
+				<div class="slider-row" style="margin-top: 8px">
+					<label>Min Word</label>
+					<input
+						type="range"
+						id="hMinWord"
+						min="2"
+						max="12"
+						value="5"
+					/>
+					<span class="value" id="hMinWordVal">5</span>
+				</div>
+				<div class="slider-row">
+					<label>After First</label>
+					<input
+						type="range"
+						id="hAfterFirst"
+						min="1"
+						max="8"
+						value="4"
+					/>
+					<span class="value" id="hAfterFirstVal">4</span>
+				</div>
+				<div class="slider-row">
+					<label>Before Last</label>
+					<input
+						type="range"
+						id="hBeforeLast"
+						min="1"
+						max="8"
+						value="3"
+					/>
+					<span class="value" id="hBeforeLastVal">3</span>
+				</div>
+				<div class="slider-row">
+					<label>Max Hyphens</label>
+					<input
+						type="range"
+						id="hMaxConsec"
+						min="0"
+						max="6"
+						value="2"
+					/>
+					<span class="value" id="hMaxConsecVal">2</span>
+				</div>
+				<div class="slider-row">
+					<label>Zone (px)</label>
+					<input
+						type="range"
+						id="hZone"
+						min="0"
+						max="100"
+						value="0"
+					/>
+					<span class="value" id="hZoneVal">0</span>
+				</div>
+			</div>
+		</div>
+
+		<div class="preview-area">
+			<h1>Preview</h1>
+			<div id="output"></div>
+		</div>
+
+		<script type="module">
+			import {compose, renderToDOM} from './bundle.mjs';
+
+			const $ = (id) => document.getElementById(id);
+
+			function smartQuotes(text) {
+				return (
+					text
+						// Double quotes
+						.replace(/"(\S)/g, '\u201C$1') // opening "
+						.replace(/(\S)"/g, '$1\u201D') // closing "
+						.replace(/"\s/g, '\u201D ') // closing " before space
+						.replace(/\s"/g, ' \u201C') // opening " after space
+						.replace(/^"/g, '\u201C') // opening " at start
+						// Single quotes / apostrophes
+						.replace(/'(\S)/g, '\u2018$1') // opening '
+						.replace(/(\S)'/g, '$1\u2019') // closing ' / apostrophe
+						.replace(/'\s/g, '\u2019 ') // closing ' before space
+						.replace(/\s'/g, ' \u2018') // opening ' after space
+						.replace(/^'/g, '\u2018') // opening ' at start
+						// Dashes
+						.replace(/---/g, '\u2014') // em dash
+						.replace(/--/g, '\u2013') // en dash
+						// Ellipsis
+						.replace(/\.\.\./g, '\u2026')
+				);
+			}
+
+			// Wire up slider value displays
+			const sliders = [
+				'containerWidth',
+				'wsMin',
+				'wsDesired',
+				'wsMax',
+				'lsMin',
+				'lsDesired',
+				'lsMax',
+				'gsMin',
+				'gsDesired',
+				'gsMax',
+				'autoLeading',
+				'baselineGrid',
+				'hMinWord',
+				'hAfterFirst',
+				'hBeforeLast',
+				'hMaxConsec',
+				'hZone',
+				'ragShortLine',
+			];
+
+			for (const id of sliders) {
+				const input = $(id);
+				const display = $(id + 'Val');
+				input.addEventListener('input', () => {
+					if (id === 'autoLeading' || id === 'ragShortLine')
+						display.textContent = input.value + '%';
+					else if (id === 'baselineGrid')
+						display.textContent =
+							input.value === '0' ? 'off' : input.value + 'px';
+					else display.textContent = input.value;
+					update();
+				});
+			}
+
+			$('textInput').addEventListener('input', update);
+			$('fontInput').addEventListener('input', update);
+			$('singleWord').addEventListener('change', update);
+			$('showGuides').addEventListener('change', update);
+			$('avoidWidows').addEventListener('change', update);
+			$('opticalAlignment').addEventListener('change', update);
+			$('smartQuotes').addEventListener('change', update);
+			$('hyphenEnabled').addEventListener('change', update);
+
+			// Alignment bar
+			let lastLineAlign = 'left';
+			for (const btn of $('alignmentBar').querySelectorAll('button')) {
+				btn.addEventListener('click', () => {
+					$('alignmentBar')
+						.querySelector('.active')
+						?.classList.remove('active');
+					btn.classList.add('active');
+					lastLineAlign = btn.dataset.align;
+					update();
+				});
+			}
+
+			// Mode toggle (Justify / Rag)
+			let textMode = 'justify';
+			for (const btn of $('modeBar').querySelectorAll('button')) {
+				btn.addEventListener('click', () => {
+					$('modeBar')
+						.querySelector('.active')
+						?.classList.remove('active');
+					btn.classList.add('active');
+					textMode = btn.dataset.mode;
+					$('ragControls').style.display =
+						textMode === 'rag' ? '' : 'none';
+					update();
+				});
+			}
+
+			// Composer toggle
+			let composer = 'paragraph';
+			for (const btn of $('composerBar').querySelectorAll('button')) {
+				btn.addEventListener('click', () => {
+					$('composerBar')
+						.querySelector('.active')
+						?.classList.remove('active');
+					btn.classList.add('active');
+					composer = btn.dataset.composer;
+					update();
+				});
+			}
+
+			function update() {
+				const raw = $('textInput').value;
+				const text = $('smartQuotes').checked ? smartQuotes(raw) : raw;
+				const font = $('fontInput').value;
+				const containerWidth = parseInt($('containerWidth').value);
+
+				const config = {
+					wordSpacing: {
+						min: parseInt($('wsMin').value),
+						desired: parseInt($('wsDesired').value),
+						max: parseInt($('wsMax').value),
+					},
+					letterSpacing: {
+						min: parseInt($('lsMin').value),
+						desired: parseInt($('lsDesired').value),
+						max: parseInt($('lsMax').value),
+					},
+					glyphScaling: {
+						min: parseInt($('gsMin').value),
+						desired: parseInt($('gsDesired').value),
+						max: parseInt($('gsMax').value),
+					},
+					autoLeading: parseInt($('autoLeading').value),
+					singleWordJustification: $('singleWord').value,
+					lastLineAlignment: lastLineAlign,
+					avoidWidows: $('avoidWidows').checked,
+					opticalAlignment: $('opticalAlignment').checked,
+					baselineGrid: parseInt($('baselineGrid').value),
+					composer,
+					hyphenation: $('hyphenEnabled').checked
+						? {
+								minWordLength: parseInt($('hMinWord').value),
+								afterFirst: parseInt($('hAfterFirst').value),
+								beforeLast: parseInt($('hBeforeLast').value),
+								maxConsecutive: parseInt($('hMaxConsec').value),
+								hyphenationZone: parseInt($('hZone').value),
+							}
+						: false,
+					textMode,
+					ragStyle: 'long-short',
+					ragBalance: 80,
+					ragShortLine: parseInt($('ragShortLine').value),
+				};
+
+				try {
+					if (textMode === 'browser') {
+						// Native browser rendering for comparison
+						const out = $('output');
+						out.innerHTML = '';
+						const div = document.createElement('div');
+						div.style.width = containerWidth + 'px';
+						div.style.font = font;
+						div.style.textAlign =
+							lastLineAlign === 'full'
+								? 'justify'
+								: lastLineAlign;
+						div.style.lineHeight =
+							parseInt($('autoLeading').value) / 100 + '';
+						div.textContent = text;
+						out.appendChild(div);
+					} else {
+						const result = compose({
+							text,
+							font,
+							containerWidth,
+							config,
+						});
+						renderToDOM({
+							container: $('output'),
+							result,
+							font,
+							containerWidth,
+							singleWordJustification:
+								config.singleWordJustification,
+							lastLineAlignment: lastLineAlign,
+							textMode,
+							showGuides: $('showGuides').checked,
+							onTextChange: (newText) => {
+								$('textInput').value = newText;
+								update();
+							},
+						});
+					}
+				} catch (e) {
+					$('output').textContent = 'Error: ' + e.message;
+				}
+			}
+
+			// Initial render
+			update();
+		</script>
+	</body>
+</html>
