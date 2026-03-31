@@ -246,7 +246,9 @@ function applyTypographersQuotes(text: string): string {
       .replace(/"\s/g, '\u201D ')
       .replace(/\s"/g, ' \u201C')
       .replace(/^"/g, '\u201C')
-      // Single quotes / apostrophes
+      // Apostrophes (must come before open/close single quotes)
+      .replace(/(\w)'(\w)/g, '$1\u2019$2')
+      // Single quotes
       .replace(/'(\S)/g, '\u2018$1')
       .replace(/(\S)'/g, '$1\u2019')
       .replace(/'\s/g, '\u2019 ')
