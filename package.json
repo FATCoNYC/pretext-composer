@@ -38,10 +38,12 @@
   "packageManager": "pnpm@10.30.0",
   "dependencies": {
     "@chenglou/pretext": "^0.0.3",
-    "hyphen": "^1.14.1"
+    "hyphen": "^1.14.1",
+    "mdast-util-from-markdown": "^2.0.3",
+    "micromark": "^4.0.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.10",
+    "@biomejs/biome": "^2.4.8",
     "tsup": "^8.5.1",
     "typescript": "^6.0.2"
   }
