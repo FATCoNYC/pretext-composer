@@ -1,6 +1,6 @@
 {
-  "name": "pretext-composer",
-  "version": "1.0.0",
+  "name": "@fatconyc/pretext-composer",
+  "version": "0.1.0-beta.1",
   "description": "Justified text engine with Knuth-Plass line breaking, optical margins, and hyphenation",
   "type": "module",
   "main": "dist/index.js",
