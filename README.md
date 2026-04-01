@@ -1,17 +1,17 @@
-# @fatconyc/pretext-composer
+# @fatconyc/composer
 
 A paragraph composer that is better than inDesign's with proper justification, optical margins/hanging punctuation, editorial rags, multi-column layout, and inline markdown styling. Built on [@chenglou/pretext](https://github.com/chenglou/pretext).
 
 ## Install
 
 ```bash
-pnpm add @fatconyc/pretext-composer
+pnpm add @fatconyc/composer
 ```
 
 ## Quick Start
 
 ```ts
-import {compose, renderToDOM} from '@fatconyc/pretext-composer';
+import {compose, renderToDOM} from '@fatconyc/composer';
 
 const result = compose({
 	text: 'Your paragraph text here...',
@@ -57,7 +57,7 @@ const result = compose({
 Or derive fonts from your page's CSS automatically:
 
 ```ts
-import {resolveFontsFromCSS} from '@fatconyc/pretext-composer';
+import {resolveFontsFromCSS} from '@fatconyc/composer';
 
 const fonts = resolveFontsFromCSS(document.body, '16px Georgia');
 ```
@@ -65,7 +65,7 @@ const fonts = resolveFontsFromCSS(document.body, '16px Georgia');
 ### Multi-Column Layout
 
 ```ts
-import {composeColumns, renderColumnsToDOM} from '@fatconyc/pretext-composer';
+import {composeColumns, renderColumnsToDOM} from '@fatconyc/composer';
 
 // Pure computation — pass column widths directly, no DOM needed
 const result = composeColumns({
@@ -184,7 +184,7 @@ interface RenderOptions {
 All settings mirror InDesign's Justification panel. Each spacing axis has `min`, `desired`, and `max` values.
 
 ```ts
-import {compose, DEFAULT_CONFIG} from '@fatconyc/pretext-composer';
+import {compose, DEFAULT_CONFIG} from '@fatconyc/composer';
 
 const result = compose({
 	text: '...',
@@ -322,31 +322,116 @@ Then open `http://localhost:3000`. Features:
 
 ## Custom Rendering
 
-`compose()` returns plain data, so you can build your own renderer for any framework or target (React, Vue, Canvas, SVG, etc.):
+`compose()` returns plain data, so you can build your own renderer for any framework or target (React, Vue, Canvas, SVG, etc.).
+
+### Line data
+
+Each line in `result.lines` provides everything needed to render:
 
 ```ts
 const result = compose({text, font, containerWidth, markdown: true});
 
 for (const line of result.lines) {
-	// line.segments — array of words (plain text)
-	// line.styledSegments — array of styled word data (when markdown is used)
-	// line.wordGapPx — exact gap between each word
-	// line.letterSpacingPx — letter spacing to apply
-	// line.glyphScale — horizontal scale factor
-	// line.hangLeft / line.hangRight — optical margin offsets
-	// line.y — vertical position
+	line.segments        // string[] — words on this line (plain text)
+	line.styledSegments  // StyledSegment[] — styled runs per word (when markdown is used)
+	line.wordGapPx       // number — exact pixel gap between words
+	line.letterSpacingPx // number — letter spacing adjustment in px
+	line.glyphScale      // number — horizontal scale factor (1 = normal)
+	line.hangLeft        // number — left optical margin offset in px
+	line.hangRight       // number — right optical margin offset in px
+	line.y               // number — vertical position in px
+	line.isLastLine      // boolean — last line of a paragraph
+}
+```
 
-	if (line.styledSegments) {
-		for (const seg of line.styledSegments) {
-			for (const run of seg.runs) {
-				// run.text — text content
-				// run.font — resolved CSS font string
-				// run.style — { bold?, italic?, code?, href? }
+### Applying spacing
+
+The composer computes three spacing adjustments per line. Apply them in this order:
+
+1. **Word spacing** (`wordGapPx`): The exact gap between words. Use real space characters with CSS `word-spacing` set to `wordGapPx - naturalSpaceWidth`, or place words at explicit x-offsets (Canvas/SVG).
+2. **Letter spacing** (`letterSpacingPx`): Apply to every character on the line, including spaces.
+3. **Glyph scaling** (`glyphScale`): Horizontal scale applied to the entire line. In DOM, use `transform: scaleX()`. In Canvas, scale the context. Note: scaling affects word gaps and letter spacing too — `wordGapPx` is already corrected for this, so applying all three together produces the exact target line width.
+
+### Handling styled segments
+
+When `markdown: true`, each line has `styledSegments` — an array of word-level segments, each containing one or more styled runs:
+
+```ts
+interface StyledSegment {
+	runs: ResolvedRun[]  // one or more runs that make up this word
+}
+
+interface ResolvedRun {
+	text: string         // text content
+	font: string         // resolved CSS font string (e.g., "bold 16px Georgia")
+	style: {
+		bold?: boolean
+		italic?: boolean
+		code?: boolean
+		href?: string    // link URL
+		fontSize?: number
+	}
+}
+```
+
+A single word like "**Hello**World" becomes one segment with two runs (bold "Hello", normal "World"). Spaces only appear *between* segments, never inside them.
+
+### Grouping links and code spans
+
+Consecutive segments sharing the same `href` or `code` style should be grouped under a single wrapper to produce correct visual output:
+
+- **Links**: Group consecutive segments with the same `href` into one anchor. Insert spaces between words *inside* the anchor so the underline renders continuously across word boundaries. Use `word-spacing` or equivalent to control the gap — don't use margins or padding, which break the underline.
+- **Code**: Group consecutive `code` segments under one wrapper for a continuous background.
+
+Example grouping logic:
+
+```ts
+for (const line of result.lines) {
+	let i = 0;
+	while (i < line.styledSegments.length) {
+		const seg = line.styledSegments[i];
+		const href = seg.runs[0]?.style.href;
+
+		if (href && seg.runs.every(r => r.style.href === href)) {
+			// Collect consecutive segments with the same href
+			const group = [];
+			while (i < line.styledSegments.length &&
+				line.styledSegments[i].runs.every(r => r.style.href === href)) {
+				group.push(line.styledSegments[i]);
+				i++;
 			}
+			renderLink(href, group); // render as one <a> / annotation
+		} else if (seg.runs.every(r => r.style.code)) {
+			// Collect consecutive code segments
+			const group = [];
+			while (i < line.styledSegments.length &&
+				line.styledSegments[i].runs.every(r => r.style.code)) {
+				group.push(line.styledSegments[i]);
+				i++;
+			}
+			renderCode(group); // render as one <code> / styled block
+		} else {
+			renderSegment(seg);
+			i++;
 		}
 	}
 }
 ```
+
+### Incomplete lines
+
+The last line of a paragraph (`isLastLine`) and single-word lines typically should not be justified. Instead, use `lastLineAlignment` to align them (left, right, center, or full). When not fully justified, ignore `wordGapPx` and use natural word spacing.
+
+### Optical margins
+
+When `opticalAlignment` is enabled, `hangLeft` and `hangRight` indicate how far punctuation extends beyond the text block edges. Only `hangLeft` requires explicit handling — offset the line start by `-hangLeft`. `hangRight` is already baked into `wordGapPx` by the composer (the extra width from both hangs is distributed into the word gap calculation), so the last character naturally extends past the right margin without any additional offset.
+
+### Copy/paste
+
+If your renderer uses absolute positioning or non-flow layout, copied text may lose spaces or line breaks. Strategies to fix this:
+
+- Insert real space characters between words (not just visual gaps)
+- Add a `copy` event handler that reconstructs paragraph text from the line data, joining lines with spaces and paragraphs with newlines
 
 ## Built On
 
