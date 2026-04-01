@@ -17,10 +17,11 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsup && cp playground/index.html docs/index.html",
+    "copy-playground": "cp playground/index.html playground/styles.css playground/app.js playground/samples.js docs/",
+    "build": "tsup && pnpm run copy-playground",
     "dev": "tsup --watch",
-    "playground": "tsup && cp playground/index.html docs/index.html && npx serve docs",
-    "playground:dev": "cp playground/index.html docs/index.html && esbuild src/index.ts --bundle --format=esm --outfile=docs/bundle.js --serve=3000 --servedir=docs --watch",
+    "playground": "pnpm run build && npx serve docs",
+    "playground:dev": "pnpm run copy-playground && esbuild src/index.ts --bundle --format=esm --outfile=docs/bundle.js --serve=3000 --servedir=docs --watch",
     "lint": "biome check src/",
     "lint:fix": "biome check --fix src/",
     "prepublishOnly": "pnpm run build"

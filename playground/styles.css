@@ -1,0 +1,286 @@
+/* === Reset === */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* === Layout === */
+
+body {
+  font-family: freight-display-pro, Georgia, serif;
+  background: #fffdf6;
+  color: #650002;
+  line-height: 1.5;
+  padding: 24px;
+  display: flex;
+  gap: 24px;
+  min-height: 100vh;
+}
+
+.controls {
+  width: 360px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.preview-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 24px;
+  align-self: flex-start;
+}
+
+/* === Typography === */
+
+h1 {
+  font-family: freightdispcmp-pro, Georgia, serif;
+  font-size: 36px;
+  font-weight: 400;
+}
+
+.subtitle {
+  font-style: italic;
+  font-size: 20px;
+  color: #650002;
+  margin-top: -16px;
+}
+
+.subtitle a {
+  color: #650002;
+}
+
+.muted {
+  font-size: 18px;
+  color: #9a6a6b;
+}
+
+.github-link {
+  font-size: 18px;
+  color: #650002;
+  text-decoration: none;
+  font-style: italic;
+}
+
+/* === Control groups === */
+
+.control-group {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(101, 0, 2, 0.15);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.control-group h2 {
+  font-family: freight-display-pro, Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #650002;
+  margin-bottom: 8px;
+}
+
+.control-group h3 {
+  font-family: freight-display-pro, Georgia, serif;
+  font-size: 18px;
+  font-weight: 400;
+  font-style: italic;
+  color: #650002;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.control-group h3:first-of-type {
+  margin-top: 0;
+}
+
+.control-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.control-header h2 {
+  margin-bottom: 0;
+}
+
+.control-header label {
+  font-size: 18px;
+}
+
+/* === Form rows === */
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.row label {
+  font-size: 18px;
+}
+
+.row + .row {
+  margin-top: 4px;
+}
+
+.row:first-of-type {
+  margin-top: 0;
+}
+
+.row-spaced {
+  margin-top: 8px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.slider-row label {
+  font-size: 18px;
+  line-height: 1;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+}
+
+.slider-row .value {
+  font-size: 18px;
+  width: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* === Form inputs === */
+
+textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 18px;
+  border: 1px solid rgba(101, 0, 2, 0.2);
+  border-radius: 4px;
+  resize: vertical;
+  background: rgba(101, 0, 2, 0.02);
+  color: #650002;
+}
+
+select,
+input[type="number"],
+input[type="text"].control-input {
+  padding: 4px 8px;
+  font-size: 18px;
+  border: 1px solid rgba(101, 0, 2, 0.2);
+  border-radius: 4px;
+  background: rgba(101, 0, 2, 0.02);
+  color: #650002;
+}
+
+input[type="text"].control-input {
+  flex: 1;
+}
+
+input[type="number"].control-input {
+  width: 60px;
+}
+
+/* === Buttons === */
+
+.btn-small {
+  font-family: freight-display-pro, Georgia, serif;
+  font-size: 16px;
+  padding: 2px 10px;
+  border: 1px solid rgba(101, 0, 2, 0.2);
+  border-radius: 4px;
+  background: transparent;
+  color: #650002;
+  cursor: pointer;
+  margin: 0 0.5em;
+}
+
+.alignment-bar {
+  display: flex;
+  gap: 0;
+}
+
+.alignment-bar button {
+  flex: 1;
+  padding: 6px 8px;
+  font-family: freight-display-pro, Georgia, serif;
+  font-size: 18px;
+  font-weight: 700;
+  border: 1px solid rgba(101, 0, 2, 0.2);
+  background: transparent;
+  color: #650002;
+  cursor: pointer;
+  transition:
+    background 0.1s,
+    border-color 0.1s;
+}
+
+.alignment-bar button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.alignment-bar button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.alignment-bar button:not(:first-child) {
+  border-left: none;
+}
+
+.alignment-bar button.active {
+  background: #650002;
+  color: #fffdf6;
+  border-color: #650002;
+}
+
+.alignment-bar button:hover:not(.active) {
+  background: rgba(101, 0, 2, 0.06);
+}
+
+/* === Rag scale labels === */
+
+.rag-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 18px;
+  color: #650002;
+  margin-top: 2px;
+}
+
+/* === Preview output === */
+
+#output {
+  background: #fff;
+  color: #1a0000;
+  border: none;
+  padding: 64px 64px 32px;
+  height: calc(100vh - 140px);
+  width: fit-content;
+  box-shadow:
+    0 1px 3px rgba(101, 0, 2, 0.06),
+    0 4px 12px rgba(101, 0, 2, 0.04);
+}
+
+/* === Spacing utilities === */
+
+.mt-8 {
+  margin-top: 8px;
+}

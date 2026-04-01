@@ -83,25 +83,28 @@ export function renderToDOM(options: RenderOptions): void {
       (isRag || line.isLastLine || line.segments.length <= 1) &&
       incompleteAlign !== 'full'
 
+    // Compute word-spacing: the extra px beyond the natural space character width
+    if (!isIncomplete && line.segments.length > 1) {
+      const ctx = document.createElement('canvas').getContext('2d')!
+      ctx.font = line.styledSegments
+        ? (line.styledSegments[0]?.runs[0]?.font || font)
+        : font
+      const naturalSpace = ctx.measureText(' ').width
+      lineDiv.style.wordSpacing = `${line.wordGapPx - naturalSpace}px`
+    }
+
     if (!isIncomplete) {
       if (line.styledSegments) {
-        renderStyledWords(lineDiv, line.styledSegments, line.wordGapPx)
+        renderStyledWords(lineDiv, line.styledSegments)
       } else {
-        for (let w = 0; w < line.segments.length; w++) {
-          const span = document.createElement('span')
-          span.textContent = line.segments[w]
-          if (w < line.segments.length - 1) {
-            span.style.marginRight = `${line.wordGapPx}px`
-          }
-          lineDiv.appendChild(span)
-        }
+        lineDiv.textContent = line.segments.join(' ')
       }
     } else {
       if (line.styledSegments) {
         if (incompleteAlign === 'right' || incompleteAlign === 'center') {
           const wrapSpan = document.createElement('span')
           wrapSpan.style.display = 'inline-block'
-          renderStyledWords(wrapSpan, line.styledSegments, -1)
+          renderStyledWords(wrapSpan, line.styledSegments)
           const ctx = document.createElement('canvas').getContext('2d')
           let textW = 0
           if (ctx) {
@@ -121,7 +124,7 @@ export function renderToDOM(options: RenderOptions): void {
           lineDiv.appendChild(wrapSpan)
         } else {
           lineDiv.style.textAlign = alignmentFor(incompleteAlign)
-          renderStyledWords(lineDiv, line.styledSegments, -1)
+          renderStyledWords(lineDiv, line.styledSegments)
         }
       } else {
         const text = line.segments.join(' ')
@@ -147,6 +150,29 @@ export function renderToDOM(options: RenderOptions): void {
 
     wrapper.appendChild(lineDiv)
   }
+
+  // Copy handler: join lines into paragraphs so paste gives flowing text
+  wrapper.addEventListener('copy', (e) => {
+    e.preventDefault()
+    const parts: string[] = []
+    for (const line of result.lines) {
+      const lineText = line.styledSegments
+        ? line.styledSegments.map((seg) => seg.runs.map((r) => r.text).join('')).join(' ')
+        : line.segments.join(' ')
+      if (parts.length > 0) {
+        const prevLine = result.lines[parts.length - 1]
+        // Previous line ended a paragraph — start a new one
+        if (prevLine?.isLastLine) {
+          parts.push('\n\n' + lineText)
+        } else {
+          parts.push(' ' + lineText)
+        }
+      } else {
+        parts.push(lineText)
+      }
+    }
+    e.clipboardData?.setData('text/plain', parts.join(''))
+  })
 
   container.appendChild(wrapper)
 
@@ -290,15 +316,18 @@ function segmentIsCode(seg: StyledSegment): boolean {
 /**
  * Renders styled word segments into a parent element.
  * Consecutive words sharing the same href are wrapped in a single <a> tag.
- * @param gapPx - word gap in pixels, or -1 to use natural spaces
+ * Spacing between words uses real space characters, controlled by the
+ * parent's word-spacing CSS property.
  */
 function renderStyledWords(
   parent: HTMLElement,
   segments: StyledSegment[],
-  gapPx: number,
 ): void {
   let w = 0
   while (w < segments.length) {
+    // Space before this segment (between words)
+    if (w > 0) parent.appendChild(document.createTextNode(' '))
+
     const href = segmentHref(segments[w])
 
     if (href) {
@@ -308,11 +337,11 @@ function renderStyledWords(
       a.style.color = 'inherit'
       a.style.textDecoration = 'underline'
 
+      let first = true
       while (w < segments.length && segmentHref(segments[w]) === href) {
+        if (!first) a.appendChild(document.createTextNode(' '))
+        first = false
         const wordSpan = document.createElement('span')
-        if (gapPx >= 0 && w < segments.length - 1) {
-          wordSpan.style.marginRight = `${gapPx}px`
-        }
         renderRunSpans(wordSpan, segments[w].runs, true)
         a.appendChild(wordSpan)
         w++
@@ -325,33 +354,19 @@ function renderStyledWords(
       code.style.borderRadius = '3px'
       code.style.boxDecorationBreak = 'clone'
 
+      let first = true
       while (w < segments.length && segmentIsCode(segments[w])) {
+        if (!first) code.appendChild(document.createTextNode(' '))
+        first = false
         const wordSpan = document.createElement('span')
-        if (gapPx >= 0 && w < segments.length - 1) {
-          wordSpan.style.marginRight = `${gapPx}px`
-        }
         renderRunSpans(wordSpan, segments[w].runs, false, true)
         code.appendChild(wordSpan)
         w++
       }
       parent.appendChild(code)
     } else {
-      const seg = segments[w]
       const wordSpan = document.createElement('span')
-
-      if (gapPx >= 0 && w < segments.length - 1) {
-        wordSpan.style.marginRight = `${gapPx}px`
-      } else if (gapPx < 0 && w < segments.length - 1) {
-        renderRunSpans(wordSpan, seg.runs, false)
-        parent.appendChild(wordSpan)
-        const spaceSpan = document.createElement('span')
-        spaceSpan.textContent = ' '
-        parent.appendChild(spaceSpan)
-        w++
-        continue
-      }
-
-      renderRunSpans(wordSpan, seg.runs, false)
+      renderRunSpans(wordSpan, segments[w].runs, false)
       parent.appendChild(wordSpan)
       w++
     }
