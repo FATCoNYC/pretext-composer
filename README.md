@@ -255,7 +255,7 @@ Text/Markdown → Typographer's Quotes → Hyphenation → Line Breaking → Jus
 4. **Line breaking**: Knuth-Plass evaluates all possible break points across the paragraph to minimize overall "badness," or greedy breaks line-by-line. A two-tier adjustment ratio penalizes glyph compression more steeply than word spacing changes, preferring hyphenation over squishing.
 5. **Justification**: Distributes slack across word spacing, letter spacing, and glyph scaling
 6. **Column breaking** (optional): Balanced or fill-first distribution across columns with orphan/widow constraints
-7. **Rendering**: DOM spans with `marginRight` for word gaps, CSS `letter-spacing`, and `transform: scaleX()` for glyph scaling. Styled text renders nested spans with per-run fonts.
+7. **Rendering**: CSS `word-spacing` for word gaps, `letter-spacing` for tracking, and `transform: scaleX()` for glyph scaling. Real space characters between words enable correct copy/paste. Styled text renders nested spans with per-run fonts; links use continuous underlines across word boundaries.
 
 ### Justification Priority
 
@@ -307,6 +307,7 @@ pnpm run playground
 Then open `http://localhost:3000`. Features:
 
 - Markdown text editor with live preview
+- Random sample texts from Project Gutenberg classics
 - Multi-column layout with balanced/fill-first controls
 - Live sliders for all justification parameters
 - Alignment toolbar (Left / Center / Right / Full)
@@ -317,6 +318,7 @@ Then open `http://localhost:3000`. Features:
 - Optical Margin Alignment toggle
 - Typographer's quotes toggle
 - Hyphenation controls
+- Copy/paste preserves paragraph structure
 
 ## Custom Rendering
 
