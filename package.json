@@ -34,6 +34,10 @@
     "text-layout",
     "optical-margins"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FATCoNYC/composer"
+  },
   "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.30.0",
