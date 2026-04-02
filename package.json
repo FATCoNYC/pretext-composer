@@ -1,6 +1,6 @@
 {
   "name": "@fatconyc/composer",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "A paragraph composer that is better than inDesign's with proper justification, optical margins/hanging punctuation, and editorial rags.",
   "type": "module",
   "main": "dist/index.js",
